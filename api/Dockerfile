@@ -1,4 +1,4 @@
-FROM golang:alpine as builder
+FROM golang:alpine AS builder
 
 RUN mkdir /build
 
@@ -6,8 +6,8 @@ ADD . /build/
 
 WORKDIR /build
 
-RUN go build -o main.
-
+RUN go build -o main .
+ 
 #stage 2
 
 FROM alpine

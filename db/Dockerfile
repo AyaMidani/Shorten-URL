@@ -1,2 +1,2 @@
-FROM reduis:alpine
+FROM redis:alpine
 EXPOSE 6379
