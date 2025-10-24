@@ -21,7 +21,8 @@ export default function UrlShortenerPortfolio() {
   const [history, setHistory] = useState(loadHistory());
 
   // base API – use query param ?api= to override
-  const apiBase = '';
+  const apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+
 
   useEffect(() => { saveHistory(history); }, [history]);
 
@@ -35,8 +36,8 @@ export default function UrlShortenerPortfolio() {
     }
     setLoading(true);
     try {
-
-      const res = await fetch(`${apiBase}/api/v1/`, {
+      const endpoint = `${apiBase}/api/v1`; // NO trailing slash
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, expiry: Number(expiry) }),
