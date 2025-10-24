@@ -1,27 +1,39 @@
-FROM golang:alpine AS builder
+# syntax=docker/dockerfile:1
 
-RUN mkdir /build
-
-ADD . /build/
+### Build stage
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /build
+# cache deps
+COPY go.mod go.sum ./
+RUN go mod download
 
-RUN go build -o main .
- 
-#stage 2
+# app source
+COPY . .
+# produce static linux binary named "main"
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main .
 
-FROM alpine
+### Runtime stage
+FROM alpine:3.20
 
+# TLS roots for calling Upstash (HTTPS)
+RUN apk add --no-cache ca-certificates
+
+# non-root user
 RUN adduser -S -D -H -h /app appuser
+WORKDIR /app
+
+# only copy the binary (not the whole repo)
+COPY --from=builder /build/main /app/main
+
+# ensure it's executable and owned by the app user
+RUN chmod +x /app/main && chown appuser:appuser /app/main
 
 USER appuser
 
-COPY . /app
+# Render sets PORT (typically 10000). Your app reads it in main.go.
+# Expose is just documentation; Render ignores it, but it's fine to keep:
+EXPOSE 10000
 
-COPY --from=builder /build/main /app/
-
-WORKDIR /app
-
-EXPOSE 3000
-
-CMD ["./main"]
+# start the app
+CMD ["/app/main"]
