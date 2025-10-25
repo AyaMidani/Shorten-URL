@@ -21,7 +21,7 @@ export default function UrlShortenerPortfolio() {
   const [history, setHistory] = useState(loadHistory());
 
   // base API – use query param ?api= to override
-  const apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+  const apiBase = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
 
 
   useEffect(() => { saveHistory(history); }, [history]);
