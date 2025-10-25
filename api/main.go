@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/AyaMidani/Shorten-URL/api/database"
 	routes "github.com/AyaMidani/Shorten-URL/api/routes"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -27,10 +28,16 @@ func setupRoutes(app *fiber.App) {
 }
 
 func main() {
+
 	// Load .env in local dev; on Render there may be no .env and that's fine
 	_ = godotenv.Load()
+	database.Connect()
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		ProxyHeader:             fiber.HeaderXForwardedFor,
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          []string{"0.0.0.0/0"},
+	})
 
 	// Nice-to-haves
 	app.Use(recover.New())

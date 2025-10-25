@@ -26,6 +26,9 @@ WORKDIR /app
 # only copy the binary (not the whole repo)
 COPY --from=builder /build/main /app/main
 
+# Create non-root user
+RUN adduser --disabled-password --gecos '' appuser
+
 # ensure it's executable and owned by the app user
 RUN chmod +x /app/main && chown appuser:appuser /app/main
 
