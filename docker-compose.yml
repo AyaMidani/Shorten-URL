@@ -5,11 +5,21 @@ services:
     build: api
     ports:
       - "3000:3000"
+    env_file:
+      - ./api/.env
     depends_on:
       - db
+
   db:
     build: db
     ports:
       - "6379:6379"
     volumes:
       - .data:/data
+
+  frontend:
+    build: url-shortener-ui
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
