@@ -29,7 +29,7 @@ func setupRoutes(app *fiber.App) {
 
 func main() {
 
-	// Load .env in local dev; on Render there may be no .env and that's fine
+	// Load .env in local dev
 	_ = godotenv.Load()
 	database.Connect()
 
@@ -44,11 +44,11 @@ func main() {
 	app.Use(logger.New())
 
 	// If your frontend will be on a different domain (Vercel/Netlify), keep this.
-	// If you proxy /api through the same origin, you can remove it.
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowMethods: "GET,POST,OPTIONS",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowOrigins:  "*",
+		AllowMethods:  "GET,POST,OPTIONS",
+		AllowHeaders:  "Origin, Content-Type, Accept, Authorization",
+		ExposeHeaders: "X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset",
 	}))
 
 	setupRoutes(app)
