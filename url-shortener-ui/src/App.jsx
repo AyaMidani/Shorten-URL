@@ -1,6 +1,4 @@
-import React, { useEffect, useState } from 'react';
-
-function classNames(...xs) { return xs.filter(Boolean).join(' '); }
+import { useEffect, useState } from 'react';
 
 const isValidUrl = (str) => {
   try { new URL(str); return true; } catch { return false; }
@@ -52,15 +50,14 @@ const SpinnerIcon = (props) => (
 
 export default function UrlShortenerPortfolio() {
   const [url, setUrl] = useState('');
-  const [alias, setAlias] = useState('');
   const [expiry, setExpiry] = useState('24');
+  const [customShort, setCustomShort] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState(loadHistory());
   const [copiedKey, setCopiedKey] = useState(null);
 
-  // base API – use query param ?api= to override
   const apiBase = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
 
   useEffect(() => { saveHistory(history); }, [history]);
@@ -79,9 +76,16 @@ export default function UrlShortenerPortfolio() {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, expiry: Number(expiry) }),
+        body: JSON.stringify({ 
+        url, 
+        expiry: Number(expiry), 
+        short: customShort || ''
+      }),
       });
       const data = await res.json();
+      console.log("rate limit", res.headers.get('X-RateLimit-Limit'));
+console.log("remaining", res.headers.get('X-RateLimit-Remaining'));
+console.log("reset", res.headers.get('X-RateLimit-Reset'));
       if (!res.ok) throw new Error(data?.message || 'Request failed');
 
       // Normalize outputs from various handlers
@@ -97,12 +101,11 @@ export default function UrlShortenerPortfolio() {
         `${window.location.origin}/${code}`;
 
       const short = withHttp(String(rawShort).trim()); // <-- ensure protocol
-
       const item = { url, short, code, expiry: Number(expiry), at: new Date().toISOString() };
       setResult(item);
       setHistory(([item, ...history]).slice(0, 20));
       setUrl('');
-      setAlias('');
+      setCustomShort(''); 
     } catch (err) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -145,38 +148,33 @@ export default function UrlShortenerPortfolio() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://example.com/article/123..."
-                className={classNames(
-                  'mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 outline-none transition-shadow',
-                  'focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-400',
-                  error ? 'border-rose-300' : 'border-slate-300'
-                )}
+                className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 outline-none transition-shadow focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-400 ${error ? 'border-rose-300' : 'border-slate-300'}`}
                 required
               />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Expiry (hours)</label>
-                <select
-                  value={expiry}
-                  onChange={(e) => setExpiry(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition-shadow focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-400"
-                >
-                  {['1', '6', '12', '24', '48', '72', '168'].map(v => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Custom alias (optional)</label>
-                <input
-                  type="text"
-                  value={alias}
-                  onChange={(e) => setAlias(e.target.value)}
-                  placeholder="e.g. aya-youtube"
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 outline-none transition-shadow focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-400"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Custom Short Code <span className="text-slate-400">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={customShort}
+                onChange={(e) => setCustomShort(e.target.value)}
+                placeholder="e.g. mylink"
+                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 outline-none transition-shadow focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Expiry (hours)</label>
+              <select
+                value={expiry}
+                onChange={(e) => setExpiry(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 outline-none transition-shadow focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-400"
+              >
+                {['1', '6', '12', '24', '48', '72', '168'].map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
             </div>
 
             {error && (
@@ -268,10 +266,6 @@ export default function UrlShortenerPortfolio() {
             </div>
           )}
         </section>
-
-        <footer className="mt-12 border-t border-slate-200 pt-6 text-xs text-slate-400">
-          <p>Tip: pass <code className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">?api=http://localhost:3000</code> to point this UI at a different backend base URL.</p>
-        </footer>
       </div>
     </div>
   );
