@@ -83,10 +83,7 @@ export default function UrlShortenerPortfolio() {
       }),
       });
       const data = await res.json();
-      console.log("rate limit", res.headers.get('X-RateLimit-Limit'));
-console.log("remaining", res.headers.get('X-RateLimit-Remaining'));
-console.log("reset", res.headers.get('X-RateLimit-Reset'));
-      if (!res.ok) throw new Error(data?.message || 'Request failed');
+      if (!res.ok) throw new Error(data?.error || data?.message || 'Request failed');
 
       // Normalize outputs from various handlers
       const code =

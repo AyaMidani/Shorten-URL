@@ -16,7 +16,7 @@ import (
 type request struct {
 	URL         string        `json:"url"`
 	CustomShort string        `json:"short"`
-	Expiry      time.Duration `json:"expiry"` // hours
+	Expiry      time.Duration `json:"expiry"`
 }
 
 type response struct {
@@ -24,11 +24,10 @@ type response struct {
 	CustomShort     string        `json:"short"`
 	Expiry          time.Duration `json:"expiry"`
 	XRateRemaining  int           `json:"rate_limit"`
-	XRateLimitReset time.Duration `json:"rate_limit_reset"` // minutes
+	XRateLimitReset time.Duration `json:"rate_limit_reset"`
 }
 
-// ---- Config ----
-var rlWindow = 30 * time.Minute // change if you like via env
+var rlWindow = 30 * time.Minute
 
 func getQuota() int64 {
 	q := os.Getenv("API_QUOTA")
@@ -48,7 +47,6 @@ func ShortenURL(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cannot parse JSON"})
 	}
 
-	// ---------- Rate limit (per client IP) ----------
 	ip := c.IP()
 	key := "rl:" + ip
 	quota := getQuota()
@@ -58,10 +56,7 @@ func ShortenURL(c *fiber.Ctx) error {
 	pipe.Expire(database.Ctx, key, rlWindow)
 	_, err := pipe.Exec(database.Ctx)
 
-	if err != nil {
-		// Redis problem — DO NOT rate-limit users; let request pass (or return 500 if you prefer)
-		// continue to handler logic
-	} else {
+	if err == nil {
 		count := ctr.Val()
 		ttl, _ := database.RDB.TTL(database.Ctx, key).Result()
 		reset := ttl
@@ -69,20 +64,23 @@ func ShortenURL(c *fiber.Ctx) error {
 			reset = 0
 		}
 
-		// Helpful headers
+		remaining := quota - count
+		if remaining < 0 {
+			remaining = 0
+		}
+
 		c.Set("X-RateLimit-Limit", strconv.FormatInt(quota, 10))
-		c.Set("X-RateLimit-Remaining", strconv.FormatInt(quota-count, 10))
+		c.Set("X-RateLimit-Remaining", strconv.FormatInt(remaining, 10))
 		c.Set("X-RateLimit-Reset", strconv.FormatInt(int64(reset.Seconds()), 10))
 
 		if count > quota {
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+			return c.Status(429).JSON(fiber.Map{
 				"error":            "Rate limit exceeded",
 				"rate_limit_reset": reset / time.Minute,
 			})
 		}
 	}
 
-	// ---------- Validate URL ----------
 	if !govalidator.IsURL(body.URL) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid URL"})
 	}
@@ -90,10 +88,8 @@ func ShortenURL(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "You cannot access the system"})
 	}
 
-	// Enforce scheme
 	body.URL = helpers.EnforceHTTP(body.URL)
 
-	// Short code
 	var id string
 	if body.CustomShort == "" {
 		id = uuid.New().String()[:6]
@@ -101,7 +97,6 @@ func ShortenURL(c *fiber.Ctx) error {
 		id = body.CustomShort
 	}
 
-	// Check collision
 	existing, err := database.RDB.Get(database.Ctx, id).Result()
 	if err != nil && err != redis.Nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "db error"})
@@ -110,22 +105,14 @@ func ShortenURL(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "URL custom short is already in use"})
 	}
 
-	// Default expiry = 24 hours (your original behavior)
 	if body.Expiry == 0 {
 		body.Expiry = 24
 	}
 
-	// Save mapping with expiry in seconds
 	if err := database.RDB.Set(database.Ctx, id, body.URL, body.Expiry*3600*time.Second).Err(); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Unable to connect to server"})
 	}
 
-	// Decrement remaining in the rate bucket (only if limiter worked)
-	if database.RDB != nil {
-		_ = database.RDB.Decr(database.Ctx, key).Err()
-	}
-
-	// Build response
 	resp := response{
 		URL:             body.URL,
 		CustomShort:     os.Getenv("DOMAIN") + "/" + id,
@@ -134,7 +121,6 @@ func ShortenURL(c *fiber.Ctx) error {
 		XRateLimitReset: 0,
 	}
 
-	// Populate rate headers in body (optional)
 	if rem, err := database.RDB.Get(database.Ctx, key).Result(); err == nil {
 		resp.XRateRemaining, _ = strconv.Atoi(rem)
 	}

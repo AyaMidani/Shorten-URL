@@ -43,7 +43,6 @@ func main() {
 	app.Use(recover.New())
 	app.Use(logger.New())
 
-	// If your frontend will be on a different domain (Vercel/Netlify), keep this.
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:  "*",
 		AllowMethods:  "GET,POST,OPTIONS",
